@@ -47,11 +47,11 @@
           <section class="file-box" aria-label="Requirements attachment section">
             <h3>📎 Attach requirements file</h3>
             <p class="muted small">
-              If you have a BOQ/spec/scope file, attach it here. Supported: <strong>.txt, .md, .csv</strong>.
+              Attach scope docs here. Supported: <strong>.txt, .md, .csv, .pdf</strong>.
             </p>
 
             <div class="upload-row">
-              <input type="file" id="requirementsFile" accept=".txt,.md,.csv,text/plain,text/markdown,text/csv" />
+              <input type="file" id="requirementsFile" accept=".txt,.md,.csv,.pdf,text/plain,text/markdown,text/csv,application/pdf" />
               <button type="button" id="clearFileBtn" class="secondary">Clear file</button>
             </div>
 
@@ -105,6 +105,7 @@
       </p>
     </footer>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

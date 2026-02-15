@@ -5,8 +5,8 @@ A lightweight web application that analyzes Tekla project requirements and gener
 ## Features
 
 - Requirement text analysis using front-end heuristic rules.
-- Prominent requirements attachment section with file picker + clear action.
-- Optional requirements file upload (`.txt`, `.md`, `.csv`) with auto-analysis.
+- Prominent requirements attachment section with file picker + clear action (including PDF).
+- Optional requirements file upload (`.txt`, `.md`, `.csv`, `.pdf`) with auto-analysis.
 - Automatic suggestion/auto-fill for drawing count from uploaded requirement content.
 - Quote estimation based on project type, timeline, drawing count, complexity, and revision risk.
 - Optional service add-ons (connection design, clash review, BIM coordination, QA/QC).
@@ -31,5 +31,5 @@ Then open `http://localhost:8080`.
 ## Notes
 
 - This is an estimation helper, not a final commercial quote engine.
-- Uploaded file analysis is heuristic and keyword-based.
+- Uploaded file analysis is heuristic and keyword-based; PDF text extraction uses PDF.js in browser.
 - Review generated numbers with your project lead or estimator before sharing with clients.

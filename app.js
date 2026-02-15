@@ -106,24 +106,44 @@ function analyzeRequirementsFile(text) {
   };
 }
 
+async function extractTextFromPdf(file) {
+  if (!window.pdfjsLib) {
+    throw new Error('PDF library not available');
+  }
+
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.js';
+
+  const buffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i += 1) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item) => item.str).join(' ');
+    fullText += ` ${pageText}`;
+  }
+
+  return fullText;
+}
+
+async function readRequirementsFile(file) {
+  if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+    return extractTextFromPdf(file);
+  }
+
+  return file.text();
+}
+
 function buildRecommendation({ timeline, complexity, revisionRisk, requirements }) {
   const notes = [];
 
-  if (timeline <= 4) {
-    notes.push('Compressed timeline detected: include fast-track surcharge and staged deliverables.');
-  }
-  if (complexity >= 4) {
-    notes.push('High complexity: allocate senior Tekla modeler hours for early model health checks.');
-  }
-  if (revisionRisk >= 4) {
-    notes.push('High revision risk: add revision buffer in proposal terms and assumptions.');
-  }
-  if (/ifc|coordination|clash|bim/i.test(requirements)) {
-    notes.push('Coordination-related scope found: schedule recurring coordination checkpoints.');
-  }
-  if (/connection|design|seismic/i.test(requirements)) {
-    notes.push('Engineering-sensitive scope found: validate design responsibility boundaries clearly.');
-  }
+  if (timeline <= 4) notes.push('Compressed timeline detected: include fast-track surcharge and staged deliverables.');
+  if (complexity >= 4) notes.push('High complexity: allocate senior Tekla modeler hours for early model health checks.');
+  if (revisionRisk >= 4) notes.push('High revision risk: add revision buffer in proposal terms and assumptions.');
+  if (/ifc|coordination|clash|bim/i.test(requirements)) notes.push('Coordination-related scope found: schedule recurring coordination checkpoints.');
+  if (/connection|design|seismic/i.test(requirements)) notes.push('Engineering-sensitive scope found: validate design responsibility boundaries clearly.');
 
   if (!notes.length) {
     notes.push('Scope appears standard: proceed with baseline Tekla detailing package and one revision cycle.');
@@ -141,19 +161,15 @@ function generateQuote(data) {
 
   const baseCost = data.drawingCount * basePerDrawing;
   const optionsCost = data.services.reduce((sum, key) => sum + (servicePricing[key] ?? 0), 0);
-
   const subtotal = baseCost * timelineFactor * complexityFactor * revisionFactor * typeFactor;
   const estimated = Math.round(subtotal + optionsCost);
   const contingency = Math.round(estimated * 0.1);
-  const recommendedQuote = estimated + contingency;
-
-  const riskLevel = data.complexity + data.revisionRisk >= 7 ? 'High' : data.complexity + data.revisionRisk >= 5 ? 'Medium' : 'Low';
 
   return {
     estimated,
     contingency,
-    recommendedQuote,
-    riskLevel,
+    recommendedQuote: estimated + contingency,
+    riskLevel: data.complexity + data.revisionRisk >= 7 ? 'High' : data.complexity + data.revisionRisk >= 5 ? 'Medium' : 'Low',
     recommendations: buildRecommendation(data),
   };
 }
@@ -167,19 +183,18 @@ requirementsFileInput.addEventListener('change', async () => {
   }
 
   selectedFile.textContent = `Selected file: ${file.name}`;
+  fileAnalysis.textContent = 'Analyzing file...';
 
   try {
-    const text = await file.text();
+    const text = await readRequirementsFile(file);
     const analysis = analyzeRequirementsFile(text);
 
-    if (!requirementsInput.value.trim()) {
-      requirementsInput.value = analysis.cleaned;
-    }
-
+    if (!requirementsInput.value.trim()) requirementsInput.value = analysis.cleaned;
     drawingCountInput.value = analysis.suggestedDrawingCount;
+
     fileAnalysis.innerHTML = `<strong>${file.name}</strong> analyzed.<br>${analysis.findings.join(' ')}`;
   } catch {
-    fileAnalysis.textContent = 'Could not read file. Please upload a plain text-compatible file.';
+    fileAnalysis.textContent = 'Could not read file. For PDF, ensure internet access for PDF.js and try again.';
   }
 });
 
@@ -193,7 +208,6 @@ form.addEventListener('submit', (event) => {
   event.preventDefault();
 
   const checkedServices = [...form.querySelectorAll('fieldset input:checked')].map((input) => input.value);
-
   const payload = {
     clientName: document.getElementById('clientName').value.trim(),
     projectType: document.getElementById('projectType').value,
@@ -212,22 +226,10 @@ form.addEventListener('submit', (event) => {
     <h2>Quotation Result</h2>
     <p><strong>Client:</strong> ${payload.clientName}</p>
     <div class="summary">
-      <div class="metric">
-        <strong>Estimated Cost</strong>
-        <span>${currency(analysis.estimated)}</span>
-      </div>
-      <div class="metric">
-        <strong>Contingency (10%)</strong>
-        <span>${currency(analysis.contingency)}</span>
-      </div>
-      <div class="metric">
-        <strong>Recommended Quote</strong>
-        <span>${currency(analysis.recommendedQuote)}</span>
-      </div>
-      <div class="metric">
-        <strong>Risk Level</strong>
-        <span class="badge ${riskBadgeClass}">${analysis.riskLevel}</span>
-      </div>
+      <div class="metric"><strong>Estimated Cost</strong><span>${currency(analysis.estimated)}</span></div>
+      <div class="metric"><strong>Contingency (10%)</strong><span>${currency(analysis.contingency)}</span></div>
+      <div class="metric"><strong>Recommended Quote</strong><span>${currency(analysis.recommendedQuote)}</span></div>
+      <div class="metric"><strong>Risk Level</strong><span class="badge ${riskBadgeClass}">${analysis.riskLevel}</span></div>
     </div>
 
     <h3>AI-style Scope Recommendations</h3>

@@ -4,6 +4,8 @@ const requirementsInput = document.getElementById('requirements');
 const drawingCountInput = document.getElementById('drawingCount');
 const requirementsFileInput = document.getElementById('requirementsFile');
 const fileAnalysis = document.getElementById('fileAnalysis');
+const selectedFile = document.getElementById('selectedFile');
+const clearFileBtn = document.getElementById('clearFileBtn');
 
 const projectTypeMultiplier = {
   commercial: 1.15,
@@ -159,9 +161,12 @@ function generateQuote(data) {
 requirementsFileInput.addEventListener('change', async () => {
   const file = requirementsFileInput.files?.[0];
   if (!file) {
+    selectedFile.textContent = 'No file selected.';
     fileAnalysis.textContent = 'No file analyzed yet.';
     return;
   }
+
+  selectedFile.textContent = `Selected file: ${file.name}`;
 
   try {
     const text = await file.text();
@@ -176,6 +181,12 @@ requirementsFileInput.addEventListener('change', async () => {
   } catch {
     fileAnalysis.textContent = 'Could not read file. Please upload a plain text-compatible file.';
   }
+});
+
+clearFileBtn.addEventListener('click', () => {
+  requirementsFileInput.value = '';
+  selectedFile.textContent = 'No file selected.';
+  fileAnalysis.textContent = 'No file analyzed yet.';
 });
 
 form.addEventListener('submit', (event) => {

@@ -5,6 +5,7 @@ A lightweight web application that analyzes Tekla project requirements and gener
 ## Features
 
 - Requirement text analysis using front-end heuristic rules.
+- Prominent requirements attachment section with file picker + clear action.
 - Optional requirements file upload (`.txt`, `.md`, `.csv`) with auto-analysis.
 - Automatic suggestion/auto-fill for drawing count from uploaded requirement content.
 - Quote estimation based on project type, timeline, drawing count, complexity, and revision risk.

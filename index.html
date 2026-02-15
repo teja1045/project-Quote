@@ -44,16 +44,18 @@
             <input type="number" id="drawingCount" min="1" value="50" required />
           </label>
 
-          <section class="file-box">
-            <h3>Requirements file (optional)</h3>
+          <section class="file-box" aria-label="Requirements attachment section">
+            <h3>📎 Attach requirements file</h3>
             <p class="muted small">
-              Upload a `.txt`, `.md`, or `.csv` requirements file. The app will analyze keywords,
-              detect drawing-related counts, and suggest/auto-fill drawing estimate.
+              If you have a BOQ/spec/scope file, attach it here. Supported: <strong>.txt, .md, .csv</strong>.
             </p>
-            <label>
-              Upload requirements file
+
+            <div class="upload-row">
               <input type="file" id="requirementsFile" accept=".txt,.md,.csv,text/plain,text/markdown,text/csv" />
-            </label>
+              <button type="button" id="clearFileBtn" class="secondary">Clear file</button>
+            </div>
+
+            <div id="selectedFile" class="small">No file selected.</div>
             <div id="fileAnalysis" class="muted small">No file analyzed yet.</div>
           </section>
 

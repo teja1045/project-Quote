@@ -27,11 +27,7 @@ const servicePricing = {
 };
 
 function currency(value) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 }
 
 function normalizeText(text) {
@@ -39,22 +35,24 @@ function normalizeText(text) {
 }
 
 function extractByLabel(text, labels) {
-  const labelExpr = labels.join('|');
-  const pattern = new RegExp(`(?:${labelExpr})\\s*[:=-]\\s*([^\\n.,;]+)`, 'i');
+  const pattern = new RegExp(`(?:${labels.join('|')})\\s*[:=-]\\s*([^\\n.,;]+)`, 'i');
   const match = text.match(pattern);
   return match ? match[1].trim() : null;
 }
 
 function extractDrawingCountFromText(text) {
-  const directPattern = /(\d{1,4})\s*(?:shop\s*)?(?:ga\s*)?(?:detail(?:ing)?\s*)?drawings?/gi;
-  const sheetPattern = /(\d{1,4})\s*(?:sheets?|plans?)/gi;
-  const matches = [];
+  const patterns = [
+    /(\d{1,4})\s*(?:shop\s*)?(?:ga\s*)?(?:detail(?:ing)?\s*)?drawings?/gi,
+    /(\d{1,4})\s*(?:sheets?|plans?)/gi,
+  ];
 
-  let match;
-  while ((match = directPattern.exec(text)) !== null) matches.push(Number(match[1]));
-  while ((match = sheetPattern.exec(text)) !== null) matches.push(Number(match[1]));
+  const counts = [];
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) counts.push(Number(match[1]));
+  }
 
-  return matches.length ? Math.max(...matches) : null;
+  return counts.length ? Math.max(...counts) : null;
 }
 
 function estimateDrawingCountFromScope(text) {
@@ -69,64 +67,58 @@ function estimateDrawingCountFromScope(text) {
     if (normalized.includes(token)) estimate += score;
   }
 
-  const sentenceCount = text.split(/[.!?]+/).filter(Boolean).length;
-  estimate += Math.min(sentenceCount * 2, 25);
-
+  estimate += Math.min(text.split(/[.!?]+/).filter(Boolean).length * 2, 25);
   return Math.max(15, Math.min(estimate, 500));
 }
 
 function inferProjectType(text) {
-  const normalized = text.toLowerCase();
-  if (/industrial|plant|factory|process/.test(normalized)) return 'industrial';
-  if (/residential|apartment|villa|housing/.test(normalized)) return 'residential';
-  if (/infrastructure|bridge|metro|rail|airport/.test(normalized)) return 'infrastructure';
+  const lower = text.toLowerCase();
+  if (/industrial|plant|factory|process/.test(lower)) return 'industrial';
+  if (/residential|apartment|villa|housing/.test(lower)) return 'residential';
+  if (/infrastructure|bridge|metro|rail|airport/.test(lower)) return 'infrastructure';
   return 'commercial';
 }
 
 function inferOptionalServices(text) {
-  const normalized = text.toLowerCase();
+  const lower = text.toLowerCase();
   return {
-    connectionDesign: /connection\s*design|connection\s*calc|seismic\s*design/.test(normalized),
-    clashReview: /clash|navisworks|interference/.test(normalized),
-    bimCoordination: /bim\s*coordination|coordination\s*meeting|ifc\s*coordination/.test(normalized),
-    shopDrawingQc: /qa\/?qc|quality\s*check|shop\s*drawing\s*qc/.test(normalized),
+    connectionDesign: /connection\s*design|connection\s*calc|seismic\s*design/.test(lower),
+    clashReview: /clash|navisworks|interference/.test(lower),
+    bimCoordination: /bim\s*coordination|coordination\s*meeting|ifc\s*coordination/.test(lower),
+    shopDrawingQc: /qa\/?qc|quality\s*check|shop\s*drawing\s*qc/.test(lower),
   };
 }
 
 function inferComplexity(text) {
   const explicit = extractByLabel(text, ['complexity']);
-  if (explicit) {
-    const n = Number(explicit.match(/\d+/)?.[0]);
-    if (n >= 1 && n <= 5) return n;
-  }
+  const numeric = Number(explicit?.match(/\d+/)?.[0]);
+  if (numeric >= 1 && numeric <= 5) return numeric;
 
   let score = 2;
   if (/seismic|complex|truss|heavy\s*industrial|retrofit/.test(text.toLowerCase())) score += 2;
   if (/ifc|clash|multi-discipline|coordination/.test(text.toLowerCase())) score += 1;
-  return Math.min(5, Math.max(1, score));
+  return Math.max(1, Math.min(5, score));
 }
 
 function inferRevisionRisk(text) {
-  const explicit = extractByLabel(text, ['risk', 'revision\s*risk']);
-  if (explicit) {
-    const n = Number(explicit.match(/\d+/)?.[0]);
-    if (n >= 1 && n <= 5) return n;
-  }
+  const explicit = extractByLabel(text, ['revision\s*risk', 'risk']);
+  const numeric = Number(explicit?.match(/\d+/)?.[0]);
+  if (numeric >= 1 && numeric <= 5) return numeric;
 
   let score = 2;
   if (/frequent\s*revision|tbd|to\s*be\s*confirmed|client\s*changes/.test(text.toLowerCase())) score += 2;
   if (/fast-track|urgent|compressed/.test(text.toLowerCase())) score += 1;
-  return Math.min(5, Math.max(1, score));
+  return Math.max(1, Math.min(5, score));
 }
 
 function inferTimelineWeeks(text) {
   const labeled = extractByLabel(text, ['timeline', 'delivery\s*time', 'duration']);
-  const candidate = labeled || text;
-  const weeksMatch = candidate.match(/(\d{1,2})\s*(weeks?|wks?)/i);
-  if (weeksMatch) return Math.max(1, Number(weeksMatch[1]));
+  const source = labeled || text;
+  const weekMatch = source.match(/(\d{1,2})\s*(weeks?|wks?)/i);
+  if (weekMatch) return Math.max(1, Number(weekMatch[1]));
 
-  const daysMatch = candidate.match(/(\d{1,3})\s*days?/i);
-  if (daysMatch) return Math.max(1, Math.ceil(Number(daysMatch[1]) / 7));
+  const dayMatch = source.match(/(\d{1,3})\s*days?/i);
+  if (dayMatch) return Math.max(1, Math.ceil(Number(dayMatch[1]) / 7));
 
   return 8;
 }
@@ -136,54 +128,44 @@ function inferClientName(text) {
   if (labeled) return labeled;
 
   const firstLine = text.split(/\n+/)[0]?.trim() || '';
-  const fromProjectHeader = firstLine.match(/(?:project|proposal)\s*[:\-]\s*(.+)$/i);
-  if (fromProjectHeader) return fromProjectHeader[1].trim();
-
-  return null;
+  const headerMatch = firstLine.match(/(?:project|proposal)\s*[:\-]\s*(.+)$/i);
+  return headerMatch ? headerMatch[1].trim() : null;
 }
 
-function analyzeRequirementsFile(text) {
-  const cleaned = normalizeText(text);
-  const detectedDrawingCount = extractDrawingCountFromText(cleaned);
-  const suggestedDrawingCount = detectedDrawingCount ?? estimateDrawingCountFromScope(cleaned);
-  const timeline = inferTimelineWeeks(cleaned);
-  const complexity = inferComplexity(cleaned);
-  const revisionRisk = inferRevisionRisk(cleaned);
-  const projectType = inferProjectType(cleaned);
-  const clientName = inferClientName(text);
-  const optionalServices = inferOptionalServices(cleaned);
+function analyzeRequirementsText(rawText) {
+  const cleaned = normalizeText(rawText);
+  const explicitDrawingCount = extractDrawingCountFromText(cleaned);
+  const suggestedDrawingCount = explicitDrawingCount ?? estimateDrawingCountFromScope(cleaned);
+
+  const analysis = {
+    cleaned,
+    clientName: inferClientName(rawText),
+    projectType: inferProjectType(cleaned),
+    timeline: inferTimelineWeeks(cleaned),
+    suggestedDrawingCount,
+    complexity: inferComplexity(cleaned),
+    revisionRisk: inferRevisionRisk(cleaned),
+    optionalServices: inferOptionalServices(cleaned),
+  };
 
   const findings = [
-    detectedDrawingCount
-      ? `Detected drawing/sheet quantity: ${detectedDrawingCount}.`
+    explicitDrawingCount
+      ? `Detected drawing/sheet quantity: ${explicitDrawingCount}.`
       : `No explicit drawing count found. Estimated drawing count: ${suggestedDrawingCount}.`,
-    `Detected delivery timeline: ${timeline} week(s).`,
-    `Detected complexity: ${complexity}/5.`,
-    `Detected revision risk: ${revisionRisk}/5.`,
-    `Detected project type: ${projectType}.`,
+    `Detected timeline: ${analysis.timeline} week(s).`,
+    `Detected complexity: ${analysis.complexity}/5.`,
+    `Detected revision risk: ${analysis.revisionRisk}/5.`,
+    `Detected project type: ${analysis.projectType}.`,
+    analysis.clientName ? `Detected client name: ${analysis.clientName}.` : 'Client name not clearly detected.',
   ];
 
-  if (clientName) findings.push(`Detected client name: ${clientName}.`);
-
-  return {
-    cleaned,
-    clientName,
-    projectType,
-    timeline,
-    suggestedDrawingCount,
-    complexity,
-    revisionRisk,
-    optionalServices,
-    findings,
-  };
+  return { ...analysis, findings };
 }
 
 async function extractTextFromPdf(file) {
   if (!window.pdfjsLib) throw new Error('PDF library not available');
 
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.js';
-
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.js';
   const buffer = await file.arrayBuffer();
   const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
 
@@ -191,22 +173,34 @@ async function extractTextFromPdf(file) {
   for (let i = 1; i <= pdf.numPages; i += 1) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const pageText = content.items.map((item) => item.str).join(' ');
-    fullText += ` ${pageText}`;
+    fullText += ` ${content.items.map((item) => item.str).join(' ')}`;
   }
 
   return fullText;
 }
 
 async function readRequirementsFile(file) {
-  if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) return extractTextFromPdf(file);
-  return file.text();
+  return file.type === 'application/pdf' || /\.pdf$/i.test(file.name) ? extractTextFromPdf(file) : file.text();
 }
 
 function applyOptionalServices(optionalServices) {
   form.querySelectorAll('fieldset input[type="checkbox"]').forEach((checkbox) => {
     checkbox.checked = Boolean(optionalServices[checkbox.value]);
   });
+}
+
+function gatherPayload() {
+  const services = [...form.querySelectorAll('fieldset input:checked')].map((input) => input.value);
+  return {
+    clientName: clientNameInput.value.trim(),
+    projectType: projectTypeInput.value,
+    timeline: Number(timelineInput.value),
+    drawingCount: Number(drawingCountInput.value),
+    requirements: requirementsInput.value.trim(),
+    complexity: Number(complexityInput.value),
+    revisionRisk: Number(revisionRiskInput.value),
+    services,
+  };
 }
 
 function buildRecommendation({ timeline, complexity, revisionRisk, requirements }) {
@@ -226,6 +220,7 @@ function generateQuote(data) {
   const complexityFactor = 0.85 + data.complexity * 0.12;
   const revisionFactor = 0.9 + data.revisionRisk * 0.08;
   const typeFactor = projectTypeMultiplier[data.projectType] ?? 1;
+
   const baseCost = data.drawingCount * basePerDrawing;
   const optionsCost = data.services.reduce((sum, key) => sum + (servicePricing[key] ?? 0), 0);
   const subtotal = baseCost * timelineFactor * complexityFactor * revisionFactor * typeFactor;
@@ -241,57 +236,8 @@ function generateQuote(data) {
   };
 }
 
-requirementsFileInput.addEventListener('change', async () => {
-  const file = requirementsFileInput.files?.[0];
-  if (!file) {
-    selectedFile.textContent = 'No file selected.';
-    fileAnalysis.textContent = 'No file analyzed yet.';
-    return;
-  }
-
-  selectedFile.textContent = `Selected file: ${file.name}`;
-  fileAnalysis.textContent = 'Analyzing file...';
-
-  try {
-    const text = await readRequirementsFile(file);
-    const analysis = analyzeRequirementsFile(text);
-
-    requirementsInput.value = analysis.cleaned;
-    if (analysis.clientName) clientNameInput.value = analysis.clientName;
-    projectTypeInput.value = analysis.projectType;
-    timelineInput.value = analysis.timeline;
-    drawingCountInput.value = analysis.suggestedDrawingCount;
-    complexityInput.value = analysis.complexity;
-    revisionRiskInput.value = analysis.revisionRisk;
-    applyOptionalServices(analysis.optionalServices);
-
-    fileAnalysis.innerHTML = `<strong>${file.name}</strong> analyzed.<br>${analysis.findings.join(' ')}`;
-  } catch {
-    fileAnalysis.textContent = 'Could not read file. For PDF, ensure internet access for PDF.js and try again.';
-  }
-});
-
-clearFileBtn.addEventListener('click', () => {
-  requirementsFileInput.value = '';
-  selectedFile.textContent = 'No file selected.';
-  fileAnalysis.textContent = 'No file analyzed yet.';
-});
-
-form.addEventListener('submit', (event) => {
-  event.preventDefault();
-  const checkedServices = [...form.querySelectorAll('fieldset input:checked')].map((input) => input.value);
-
-  const payload = {
-    clientName: clientNameInput.value.trim(),
-    projectType: projectTypeInput.value,
-    timeline: Number(timelineInput.value),
-    drawingCount: Number(drawingCountInput.value),
-    requirements: requirementsInput.value.trim(),
-    complexity: Number(complexityInput.value),
-    revisionRisk: Number(revisionRiskInput.value),
-    services: checkedServices,
-  };
-
+function renderQuote() {
+  const payload = gatherPayload();
   const analysis = generateQuote(payload);
   const riskBadgeClass = analysis.riskLevel === 'Low' ? 'ok' : 'warn';
 
@@ -304,10 +250,8 @@ form.addEventListener('submit', (event) => {
       <div class="metric"><strong>Recommended Quote</strong><span>${currency(analysis.recommendedQuote)}</span></div>
       <div class="metric"><strong>Risk Level</strong><span class="badge ${riskBadgeClass}">${analysis.riskLevel}</span></div>
     </div>
-
     <h3>AI-style Scope Recommendations</h3>
     <pre>${analysis.recommendations.map((n, i) => `${i + 1}. ${n}`).join('\n')}</pre>
-
     <h3>Assumptions</h3>
     <ul>
       <li>Pricing model is heuristic and front-end only (no backend calculation).</li>
@@ -315,4 +259,46 @@ form.addEventListener('submit', (event) => {
       <li>Human review is required before client submission.</li>
     </ul>
   `;
+}
+
+requirementsFileInput.addEventListener('change', async () => {
+  const file = requirementsFileInput.files?.[0];
+  if (!file) {
+    selectedFile.textContent = 'No file selected.';
+    fileAnalysis.textContent = 'No file analyzed yet.';
+    return;
+  }
+
+  selectedFile.textContent = `Selected file: ${file.name}`;
+  fileAnalysis.textContent = 'Analyzing file and generating quote...';
+
+  try {
+    const text = await readRequirementsFile(file);
+    const analysis = analyzeRequirementsText(text);
+
+    requirementsInput.value = analysis.cleaned;
+    clientNameInput.value = analysis.clientName || clientNameInput.value;
+    projectTypeInput.value = analysis.projectType;
+    timelineInput.value = analysis.timeline;
+    drawingCountInput.value = analysis.suggestedDrawingCount;
+    complexityInput.value = analysis.complexity;
+    revisionRiskInput.value = analysis.revisionRisk;
+    applyOptionalServices(analysis.optionalServices);
+
+    fileAnalysis.innerHTML = `<strong>${file.name}</strong> analyzed.<br>${analysis.findings.join(' ')}`;
+    renderQuote();
+  } catch {
+    fileAnalysis.textContent = 'Could not analyze file. For PDF, ensure internet access for PDF.js and try again.';
+  }
+});
+
+clearFileBtn.addEventListener('click', () => {
+  requirementsFileInput.value = '';
+  selectedFile.textContent = 'No file selected.';
+  fileAnalysis.textContent = 'No file analyzed yet.';
+});
+
+form.addEventListener('submit', (event) => {
+  event.preventDefault();
+  renderQuote();
 });

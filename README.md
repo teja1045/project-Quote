@@ -7,7 +7,7 @@ A lightweight web application that analyzes Tekla project requirements and gener
 - Requirement text analysis using front-end heuristic rules.
 - Prominent requirements attachment section with file picker + clear action (including PDF).
 - Optional requirements file upload (`.txt`, `.md`, `.csv`, `.pdf`) with auto-analysis.
-- Automatic extraction/auto-fill for client name, timeline, drawing count, complexity, revision risk, and optional services from uploaded requirement content, with automatic quote generation after upload.
+- Automatic extraction/auto-fill for client name, timeline, drawing count, complexity, revision risk, and optional services from uploaded requirement content, with automatic quote generation after upload and fallback defaults so no manual required-field entry is needed.
 - Quote estimation based on project type, timeline, drawing count, complexity, and revision risk.
 - Optional service add-ons (connection design, clash review, BIM coordination, QA/QC).
 - Pure HTML/CSS/JavaScript: no backend required.

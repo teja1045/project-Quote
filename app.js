@@ -159,6 +159,39 @@ function analyzeRequirementsText(rawText) {
   return { ...analysis, findings };
 }
 
+
+function filenameToClientName(filename) {
+  return filename
+    .replace(/\.[^.]+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function ensureAutofillDefaults(partial, fileName) {
+  const safeRequirements = partial.cleaned || 'Requirements inferred from uploaded file.';
+  return {
+    cleaned: safeRequirements,
+    clientName: partial.clientName || filenameToClientName(fileName) || 'Uploaded File Client',
+    projectType: partial.projectType || inferProjectType(safeRequirements),
+    timeline: Number.isFinite(partial.timeline) && partial.timeline > 0 ? partial.timeline : 8,
+    suggestedDrawingCount:
+      Number.isFinite(partial.suggestedDrawingCount) && partial.suggestedDrawingCount > 0
+        ? partial.suggestedDrawingCount
+        : estimateDrawingCountFromScope(safeRequirements),
+    complexity:
+      Number.isFinite(partial.complexity) && partial.complexity >= 1 && partial.complexity <= 5
+        ? partial.complexity
+        : inferComplexity(safeRequirements),
+    revisionRisk:
+      Number.isFinite(partial.revisionRisk) && partial.revisionRisk >= 1 && partial.revisionRisk <= 5
+        ? partial.revisionRisk
+        : inferRevisionRisk(safeRequirements),
+    optionalServices: partial.optionalServices || inferOptionalServices(safeRequirements),
+    findings: partial.findings || [],
+  };
+}
+
 async function extractTextFromPdf(file) {
   if (!window.pdfjsLib) {
     throw new Error('PDF.js failed to load in browser.');
@@ -211,14 +244,21 @@ function applyOptionalServices(optionalServices) {
 
 function gatherPayload() {
   const services = [...form.querySelectorAll('fieldset input:checked')].map((input) => input.value);
+  const requirements = requirementsInput.value.trim() || 'Requirements inferred from uploaded file.';
+  const drawingCount = Number(drawingCountInput.value) || estimateDrawingCountFromScope(requirements);
+  const timeline = Number(timelineInput.value) || inferTimelineWeeks(requirements);
+  const complexity = Number(complexityInput.value) || inferComplexity(requirements);
+  const revisionRisk = Number(revisionRiskInput.value) || inferRevisionRisk(requirements);
+  const projectType = projectTypeInput.value || inferProjectType(requirements);
+
   return {
-    clientName: clientNameInput.value.trim(),
-    projectType: projectTypeInput.value,
-    timeline: Number(timelineInput.value),
-    drawingCount: Number(drawingCountInput.value),
-    requirements: requirementsInput.value.trim(),
-    complexity: Number(complexityInput.value),
-    revisionRisk: Number(revisionRiskInput.value),
+    clientName: clientNameInput.value.trim() || 'Uploaded File Client',
+    projectType,
+    timeline,
+    drawingCount,
+    requirements,
+    complexity,
+    revisionRisk,
     services,
   };
 }
@@ -295,10 +335,11 @@ requirementsFileInput.addEventListener('change', async () => {
 
   try {
     const text = await readRequirementsFile(file);
-    const analysis = analyzeRequirementsText(text);
+    const inferred = analyzeRequirementsText(text);
+    const analysis = ensureAutofillDefaults(inferred, file.name);
 
     requirementsInput.value = analysis.cleaned;
-    clientNameInput.value = analysis.clientName || clientNameInput.value;
+    clientNameInput.value = analysis.clientName;
     projectTypeInput.value = analysis.projectType;
     timelineInput.value = analysis.timeline;
     drawingCountInput.value = analysis.suggestedDrawingCount;

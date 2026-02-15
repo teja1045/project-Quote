@@ -18,10 +18,10 @@
     <main>
       <section class="card">
         <h2>Project Input</h2>
-        <form id="quote-form">
+        <form id="quote-form" novalidate>
           <label>
             Client name
-            <input type="text" id="clientName" placeholder="Acme Structures" required />
+            <input type="text" id="clientName" placeholder="Acme Structures" />
           </label>
 
           <label>
@@ -36,12 +36,12 @@
 
           <label>
             Delivery timeline (weeks)
-            <input type="number" id="timeline" min="1" value="8" required />
+            <input type="number" id="timeline" min="1" value="8" />
           </label>
 
           <label>
             Estimated drawing count
-            <input type="number" id="drawingCount" min="1" value="50" required />
+            <input type="number" id="drawingCount" min="1" value="50" />
           </label>
 
           <section class="file-box" aria-label="Requirements attachment section">
@@ -65,7 +65,7 @@
               id="requirements"
               rows="7"
               placeholder="Describe scope, LOD, connection design, fabrication deliverables, revisions, etc."
-              required
+             
             ></textarea>
           </label>
 

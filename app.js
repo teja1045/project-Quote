@@ -1,5 +1,9 @@
 const form = document.getElementById('quote-form');
 const resultCard = document.getElementById('result-card');
+const requirementsInput = document.getElementById('requirements');
+const drawingCountInput = document.getElementById('drawingCount');
+const requirementsFileInput = document.getElementById('requirementsFile');
+const fileAnalysis = document.getElementById('fileAnalysis');
 
 const projectTypeMultiplier = {
   commercial: 1.15,
@@ -21,6 +25,83 @@ function currency(value) {
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function normalizeText(text) {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function extractDrawingCountFromText(text) {
+  const directPattern = /(\d{1,4})\s*(?:shop\s*)?(?:ga\s*)?(?:detail(?:ing)?\s*)?drawings?/gi;
+  const sheetPattern = /(\d{1,4})\s*(?:sheets?|plans?)/gi;
+  const matches = [];
+
+  let match;
+  while ((match = directPattern.exec(text)) !== null) {
+    matches.push(Number(match[1]));
+  }
+  while ((match = sheetPattern.exec(text)) !== null) {
+    matches.push(Number(match[1]));
+  }
+
+  return matches.length ? Math.max(...matches) : null;
+}
+
+function estimateDrawingCountFromScope(text) {
+  const normalized = text.toLowerCase();
+  let estimate = 30;
+
+  const complexityTokens = [
+    ['stair', 4],
+    ['seismic', 6],
+    ['connection', 5],
+    ['clash', 4],
+    ['ifc', 3],
+    ['bim', 3],
+    ['fabrication', 8],
+    ['industrial', 10],
+    ['commercial', 7],
+    ['platform', 4],
+    ['truss', 5],
+  ];
+
+  for (const [token, score] of complexityTokens) {
+    if (normalized.includes(token)) {
+      estimate += score;
+    }
+  }
+
+  const sentenceCount = text.split(/[.!?]+/).filter(Boolean).length;
+  estimate += Math.min(sentenceCount * 2, 25);
+
+  return Math.max(15, Math.min(estimate, 500));
+}
+
+function analyzeRequirementsFile(text) {
+  const cleaned = normalizeText(text);
+  const detected = extractDrawingCountFromText(cleaned);
+  const estimatedFromScope = estimateDrawingCountFromScope(cleaned);
+  const finalSuggested = detected ?? estimatedFromScope;
+
+  const findings = [];
+  if (detected) {
+    findings.push(`Detected explicit drawing/sheet quantity: ${detected}.`);
+  } else {
+    findings.push(`No explicit drawing count detected. Suggested estimate: ${estimatedFromScope}.`);
+  }
+
+  if (/ifc|coordination|clash|bim/i.test(cleaned)) {
+    findings.push('Coordination/BIM scope detected.');
+  }
+  if (/connection|seismic|design/i.test(cleaned)) {
+    findings.push('Engineering-sensitive scope detected.');
+  }
+
+  return {
+    cleaned,
+    suggestedDrawingCount: finalSuggested,
+    findings,
+  };
 }
 
 function buildRecommendation({ timeline, complexity, revisionRisk, requirements }) {
@@ -75,6 +156,28 @@ function generateQuote(data) {
   };
 }
 
+requirementsFileInput.addEventListener('change', async () => {
+  const file = requirementsFileInput.files?.[0];
+  if (!file) {
+    fileAnalysis.textContent = 'No file analyzed yet.';
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const analysis = analyzeRequirementsFile(text);
+
+    if (!requirementsInput.value.trim()) {
+      requirementsInput.value = analysis.cleaned;
+    }
+
+    drawingCountInput.value = analysis.suggestedDrawingCount;
+    fileAnalysis.innerHTML = `<strong>${file.name}</strong> analyzed.<br>${analysis.findings.join(' ')}`;
+  } catch {
+    fileAnalysis.textContent = 'Could not read file. Please upload a plain text-compatible file.';
+  }
+});
+
 form.addEventListener('submit', (event) => {
   event.preventDefault();
 
@@ -84,8 +187,8 @@ form.addEventListener('submit', (event) => {
     clientName: document.getElementById('clientName').value.trim(),
     projectType: document.getElementById('projectType').value,
     timeline: Number(document.getElementById('timeline').value),
-    drawingCount: Number(document.getElementById('drawingCount').value),
-    requirements: document.getElementById('requirements').value.trim(),
+    drawingCount: Number(drawingCountInput.value),
+    requirements: requirementsInput.value.trim(),
     complexity: Number(document.getElementById('complexity').value),
     revisionRisk: Number(document.getElementById('revisionRisk').value),
     services: checkedServices,

@@ -44,6 +44,19 @@
             <input type="number" id="drawingCount" min="1" value="50" required />
           </label>
 
+          <section class="file-box">
+            <h3>Requirements file (optional)</h3>
+            <p class="muted small">
+              Upload a `.txt`, `.md`, or `.csv` requirements file. The app will analyze keywords,
+              detect drawing-related counts, and suggest/auto-fill drawing estimate.
+            </p>
+            <label>
+              Upload requirements file
+              <input type="file" id="requirementsFile" accept=".txt,.md,.csv,text/plain,text/markdown,text/csv" />
+            </label>
+            <div id="fileAnalysis" class="muted small">No file analyzed yet.</div>
+          </section>
+
           <label>
             Requirements / scope details
             <textarea

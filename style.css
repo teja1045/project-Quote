@@ -37,6 +37,10 @@ footer p,
   color: var(--muted);
 }
 
+.small {
+  font-size: 0.9rem;
+}
+
 main {
   max-width: 1100px;
   margin: 0 auto;
@@ -52,6 +56,22 @@ main {
   border-radius: 14px;
   padding: 1rem;
   box-shadow: 0 4px 14px rgba(17, 24, 39, 0.06);
+}
+
+.file-box {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 0.8rem;
+  margin-top: 1rem;
+  background: #fafcff;
+}
+
+.file-box h3 {
+  margin: 0 0 0.4rem;
+}
+
+#fileAnalysis {
+  margin-top: 0.5rem;
 }
 
 label,

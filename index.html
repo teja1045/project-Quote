@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SDE Tekla AI Quotation Assistant</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>SDE Tekla AI Quotation Assistant</h1>
+      <p>
+        Front-end-only web app to analyze project requirements and generate a
+        price quotation estimate.
+      </p>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Project Input</h2>
+        <form id="quote-form">
+          <label>
+            Client name
+            <input type="text" id="clientName" placeholder="Acme Structures" required />
+          </label>
+
+          <label>
+            Project type
+            <select id="projectType">
+              <option value="commercial">Commercial</option>
+              <option value="industrial">Industrial</option>
+              <option value="residential">Residential</option>
+              <option value="infrastructure">Infrastructure</option>
+            </select>
+          </label>
+
+          <label>
+            Delivery timeline (weeks)
+            <input type="number" id="timeline" min="1" value="8" required />
+          </label>
+
+          <label>
+            Estimated drawing count
+            <input type="number" id="drawingCount" min="1" value="50" required />
+          </label>
+
+          <label>
+            Requirements / scope details
+            <textarea
+              id="requirements"
+              rows="7"
+              placeholder="Describe scope, LOD, connection design, fabrication deliverables, revisions, etc."
+              required
+            ></textarea>
+          </label>
+
+          <div class="grid-2">
+            <label>
+              Complexity
+              <input type="range" id="complexity" min="1" max="5" value="3" />
+            </label>
+            <label>
+              Revision risk
+              <input type="range" id="revisionRisk" min="1" max="5" value="2" />
+            </label>
+          </div>
+
+          <fieldset>
+            <legend>Optional services</legend>
+            <label><input type="checkbox" value="connectionDesign" /> Connection design</label>
+            <label><input type="checkbox" value="clashReview" /> Clash review support</label>
+            <label><input type="checkbox" value="bimCoordination" /> BIM coordination meetings</label>
+            <label><input type="checkbox" value="shopDrawingQc" /> Shop drawing QA/QC package</label>
+          </fieldset>
+
+          <button type="submit">Analyze & Generate Quote</button>
+        </form>
+      </section>
+
+      <section class="card" id="result-card" aria-live="polite">
+        <h2>Quotation Result</h2>
+        <p class="muted">Fill the form and click <em>Analyze & Generate Quote</em>.</p>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        This estimate is AI-assisted and heuristic-based. Final pricing should be
+        reviewed by your Tekla project lead.
+      </p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

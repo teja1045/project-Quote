@@ -35,9 +35,8 @@ function normalizeText(text) {
 }
 
 function extractByLabel(text, labels) {
-  const pattern = new RegExp(`(?:${labels.join('|')})\\s*[:=-]\\s*([^\\n.,;]+)`, 'i');
-  const match = text.match(pattern);
-  return match ? match[1].trim() : null;
+  const pattern = new RegExp(`(?:^|[\\n\\r])\\s*(?:${labels.join('|')})\\s*[:=-]\\s*([^\\n\\r]+)`, 'im');
+  return text.match(pattern)?.[1]?.trim() || null;
 }
 
 function extractDrawingCountFromText(text) {
@@ -56,7 +55,7 @@ function extractDrawingCountFromText(text) {
 }
 
 function estimateDrawingCountFromScope(text) {
-  const normalized = text.toLowerCase();
+  const lower = text.toLowerCase();
   let estimate = 30;
   const tokens = [
     ['stair', 4], ['seismic', 6], ['connection', 5], ['clash', 4], ['ifc', 3],
@@ -64,7 +63,7 @@ function estimateDrawingCountFromScope(text) {
   ];
 
   for (const [token, score] of tokens) {
-    if (normalized.includes(token)) estimate += score;
+    if (lower.includes(token)) estimate += score;
   }
 
   estimate += Math.min(text.split(/[.!?]+/).filter(Boolean).length * 2, 25);
@@ -90,9 +89,8 @@ function inferOptionalServices(text) {
 }
 
 function inferComplexity(text) {
-  const explicit = extractByLabel(text, ['complexity']);
-  const numeric = Number(explicit?.match(/\d+/)?.[0]);
-  if (numeric >= 1 && numeric <= 5) return numeric;
+  const explicit = Number(extractByLabel(text, ['complexity'])?.match(/\d+/)?.[0]);
+  if (explicit >= 1 && explicit <= 5) return explicit;
 
   let score = 2;
   if (/seismic|complex|truss|heavy\s*industrial|retrofit/.test(text.toLowerCase())) score += 2;
@@ -101,9 +99,8 @@ function inferComplexity(text) {
 }
 
 function inferRevisionRisk(text) {
-  const explicit = extractByLabel(text, ['revision\s*risk', 'risk']);
-  const numeric = Number(explicit?.match(/\d+/)?.[0]);
-  if (numeric >= 1 && numeric <= 5) return numeric;
+  const explicit = Number(extractByLabel(text, ['revision\s*risk', 'risk'])?.match(/\d+/)?.[0]);
+  if (explicit >= 1 && explicit <= 5) return explicit;
 
   let score = 2;
   if (/frequent\s*revision|tbd|to\s*be\s*confirmed|client\s*changes/.test(text.toLowerCase())) score += 2;
@@ -114,11 +111,12 @@ function inferRevisionRisk(text) {
 function inferTimelineWeeks(text) {
   const labeled = extractByLabel(text, ['timeline', 'delivery\s*time', 'duration']);
   const source = labeled || text;
-  const weekMatch = source.match(/(\d{1,2})\s*(weeks?|wks?)/i);
-  if (weekMatch) return Math.max(1, Number(weekMatch[1]));
 
-  const dayMatch = source.match(/(\d{1,3})\s*days?/i);
-  if (dayMatch) return Math.max(1, Math.ceil(Number(dayMatch[1]) / 7));
+  const weeks = source.match(/(\d{1,2})\s*(weeks?|wks?)/i);
+  if (weeks) return Math.max(1, Number(weeks[1]));
+
+  const days = source.match(/(\d{1,3})\s*days?/i);
+  if (days) return Math.max(1, Math.ceil(Number(days[1]) / 7));
 
   return 8;
 }
@@ -128,23 +126,22 @@ function inferClientName(text) {
   if (labeled) return labeled;
 
   const firstLine = text.split(/\n+/)[0]?.trim() || '';
-  const headerMatch = firstLine.match(/(?:project|proposal)\s*[:\-]\s*(.+)$/i);
-  return headerMatch ? headerMatch[1].trim() : null;
+  return firstLine.match(/(?:project|proposal)\s*[:\-]\s*(.+)$/i)?.[1]?.trim() || null;
 }
 
 function analyzeRequirementsText(rawText) {
   const cleaned = normalizeText(rawText);
-  const explicitDrawingCount = extractDrawingCountFromText(cleaned);
+  const explicitDrawingCount = extractDrawingCountFromText(rawText);
   const suggestedDrawingCount = explicitDrawingCount ?? estimateDrawingCountFromScope(cleaned);
 
   const analysis = {
     cleaned,
     clientName: inferClientName(rawText),
     projectType: inferProjectType(cleaned),
-    timeline: inferTimelineWeeks(cleaned),
+    timeline: inferTimelineWeeks(rawText),
     suggestedDrawingCount,
-    complexity: inferComplexity(cleaned),
-    revisionRisk: inferRevisionRisk(cleaned),
+    complexity: inferComplexity(rawText),
+    revisionRisk: inferRevisionRisk(rawText),
     optionalServices: inferOptionalServices(cleaned),
   };
 
@@ -163,24 +160,47 @@ function analyzeRequirementsText(rawText) {
 }
 
 async function extractTextFromPdf(file) {
-  if (!window.pdfjsLib) throw new Error('PDF library not available');
+  if (!window.pdfjsLib) {
+    throw new Error('PDF.js failed to load in browser.');
+  }
 
   window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.js';
-  const buffer = await file.arrayBuffer();
-  const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
 
-  let fullText = '';
+  const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pageTexts = [];
+
   for (let i = 1; i <= pdf.numPages; i += 1) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    fullText += ` ${content.items.map((item) => item.str).join(' ')}`;
+    const items = content.items || [];
+
+    const linesByY = new Map();
+    for (const item of items) {
+      const y = Math.round(item.transform?.[5] || 0);
+      if (!linesByY.has(y)) linesByY.set(y, []);
+      linesByY.get(y).push(item.str);
+    }
+
+    const lines = [...linesByY.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([, parts]) => parts.join(' ').trim())
+      .filter(Boolean);
+
+    pageTexts.push(lines.join('\n'));
   }
 
-  return fullText;
+  const combinedText = pageTexts.join('\n\n').trim();
+  if (!combinedText) {
+    throw new Error('No readable text found in PDF. If this PDF is scanned/image-only, use OCR or upload text/csv/md/txt.');
+  }
+
+  return combinedText;
 }
 
 async function readRequirementsFile(file) {
-  return file.type === 'application/pdf' || /\.pdf$/i.test(file.name) ? extractTextFromPdf(file) : file.text();
+  return file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+    ? extractTextFromPdf(file)
+    : file.text();
 }
 
 function applyOptionalServices(optionalServices) {
@@ -224,6 +244,7 @@ function generateQuote(data) {
   const baseCost = data.drawingCount * basePerDrawing;
   const optionsCost = data.services.reduce((sum, key) => sum + (servicePricing[key] ?? 0), 0);
   const subtotal = baseCost * timelineFactor * complexityFactor * revisionFactor * typeFactor;
+
   const estimated = Math.round(subtotal + optionsCost);
   const contingency = Math.round(estimated * 0.1);
 
@@ -287,8 +308,9 @@ requirementsFileInput.addEventListener('change', async () => {
 
     fileAnalysis.innerHTML = `<strong>${file.name}</strong> analyzed.<br>${analysis.findings.join(' ')}`;
     renderQuote();
-  } catch {
-    fileAnalysis.textContent = 'Could not analyze file. For PDF, ensure internet access for PDF.js and try again.';
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not analyze file.';
+    fileAnalysis.textContent = `File analysis failed: ${message}`;
   }
 });
 

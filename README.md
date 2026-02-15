@@ -31,5 +31,5 @@ Then open `http://localhost:8080`.
 ## Notes
 
 - This is an estimation helper, not a final commercial quote engine.
-- Uploaded file analysis is heuristic and keyword-based; PDF text extraction uses PDF.js in browser.
+- Uploaded file analysis is heuristic and keyword-based; PDF text extraction uses PDF.js in browser (scanned/image-only PDFs need OCR to extract text).
 - Review generated numbers with your project lead or estimator before sharing with clients.

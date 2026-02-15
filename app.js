@@ -12,6 +12,22 @@ const fileAnalysis = document.getElementById('fileAnalysis');
 const selectedFile = document.getElementById('selectedFile');
 const clearFileBtn = document.getElementById('clearFileBtn');
 
+
+const DEFAULT_FORM_VALUES = {
+  clientName: '',
+  projectType: 'commercial',
+  timeline: 8,
+  drawingCount: 50,
+  requirements: '',
+  complexity: 3,
+  revisionRisk: 2,
+};
+
+const DEFAULT_RESULT_HTML = `
+  <h2>Quotation Result</h2>
+  <p class="muted">Fill the form and click <em>Analyze & Generate Quote</em>.</p>
+`;
+
 const projectTypeMultiplier = {
   commercial: 1.15,
   industrial: 1.3,
@@ -355,10 +371,28 @@ requirementsFileInput.addEventListener('change', async () => {
   }
 });
 
+
+function resetFormToDefaults() {
+  clientNameInput.value = DEFAULT_FORM_VALUES.clientName;
+  projectTypeInput.value = DEFAULT_FORM_VALUES.projectType;
+  timelineInput.value = DEFAULT_FORM_VALUES.timeline;
+  drawingCountInput.value = DEFAULT_FORM_VALUES.drawingCount;
+  requirementsInput.value = DEFAULT_FORM_VALUES.requirements;
+  complexityInput.value = DEFAULT_FORM_VALUES.complexity;
+  revisionRiskInput.value = DEFAULT_FORM_VALUES.revisionRisk;
+
+  form.querySelectorAll('fieldset input[type="checkbox"]').forEach((checkbox) => {
+    checkbox.checked = false;
+  });
+
+  resultCard.innerHTML = DEFAULT_RESULT_HTML;
+}
+
 clearFileBtn.addEventListener('click', () => {
   requirementsFileInput.value = '';
   selectedFile.textContent = 'No file selected.';
   fileAnalysis.textContent = 'No file analyzed yet.';
+  resetFormToDefaults();
 });
 
 form.addEventListener('submit', (event) => {

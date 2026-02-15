@@ -341,6 +341,7 @@ function renderQuote() {
 requirementsFileInput.addEventListener('change', async () => {
   const file = requirementsFileInput.files?.[0];
   if (!file) {
+    resetFormToDefaults();
     selectedFile.textContent = 'No file selected.';
     fileAnalysis.textContent = 'No file analyzed yet.';
     return;
@@ -373,6 +374,8 @@ requirementsFileInput.addEventListener('change', async () => {
 
 
 function resetFormToDefaults() {
+  form.reset();
+
   clientNameInput.value = DEFAULT_FORM_VALUES.clientName;
   projectTypeInput.value = DEFAULT_FORM_VALUES.projectType;
   timelineInput.value = DEFAULT_FORM_VALUES.timeline;
@@ -388,11 +391,21 @@ function resetFormToDefaults() {
   resultCard.innerHTML = DEFAULT_RESULT_HTML;
 }
 
-clearFileBtn.addEventListener('click', () => {
+function clearUploadedFileAndData() {
   requirementsFileInput.value = '';
+
+  if (requirementsFileInput.value) {
+    requirementsFileInput.type = 'text';
+    requirementsFileInput.type = 'file';
+  }
+
   selectedFile.textContent = 'No file selected.';
   fileAnalysis.textContent = 'No file analyzed yet.';
   resetFormToDefaults();
+}
+
+clearFileBtn.addEventListener('click', () => {
+  clearUploadedFileAndData();
 });
 
 form.addEventListener('submit', (event) => {

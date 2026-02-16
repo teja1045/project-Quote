@@ -42,6 +42,8 @@ const servicePricing = {
   shopDrawingQc: 650,
 };
 
+const QUOTE_API_URL = 'https://repo-backend-wmej.onrender.com/api/quote';
+
 function currency(value) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 }
@@ -313,9 +315,64 @@ function generateQuote(data) {
   };
 }
 
-function renderQuote() {
+async function requestQuoteFromApi(payload) {
+  const response = await fetch(QUOTE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Quote API request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  return {
+    estimated: Number(data.estimated ?? data.estimatedCost ?? data.subtotal),
+    contingency: Number(data.contingency ?? data.contingencyAmount ?? 0),
+    recommendedQuote: Number(data.recommendedQuote ?? data.totalQuote ?? data.total),
+    riskLevel: data.riskLevel ?? data.risk ?? 'Medium',
+    recommendations: Array.isArray(data.recommendations) ? data.recommendations : buildRecommendation(payload),
+  };
+}
+
+function normalizeApiQuote(apiQuote, fallbackQuote) {
+  const estimated = Number.isFinite(apiQuote.estimated) ? apiQuote.estimated : fallbackQuote.estimated;
+  const contingency = Number.isFinite(apiQuote.contingency) ? apiQuote.contingency : fallbackQuote.contingency;
+  const recommendedQuote = Number.isFinite(apiQuote.recommendedQuote)
+    ? apiQuote.recommendedQuote
+    : estimated + contingency;
+
+  return {
+    estimated,
+    contingency,
+    recommendedQuote,
+    riskLevel: apiQuote.riskLevel || fallbackQuote.riskLevel,
+    recommendations:
+      Array.isArray(apiQuote.recommendations) && apiQuote.recommendations.length
+        ? apiQuote.recommendations
+        : fallbackQuote.recommendations,
+  };
+}
+
+async function renderQuote() {
   const payload = gatherPayload();
-  const analysis = generateQuote(payload);
+  const localAnalysis = generateQuote(payload);
+  let analysis = localAnalysis;
+
+  try {
+    const apiQuote = await requestQuoteFromApi(payload);
+    analysis = normalizeApiQuote(apiQuote, localAnalysis);
+    fileAnalysis.textContent = fileAnalysis.textContent.includes('failed')
+      ? fileAnalysis.textContent
+      : 'File analyzed. Quote generated via backend API.';
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown API error';
+    fileAnalysis.textContent = `API unavailable (${message}). Showing local estimate.`;
+  }
+
   const riskBadgeClass = analysis.riskLevel === 'Low' ? 'ok' : 'warn';
 
   resultCard.innerHTML = `
@@ -331,8 +388,8 @@ function renderQuote() {
     <pre>${analysis.recommendations.map((n, i) => `${i + 1}. ${n}`).join('\n')}</pre>
     <h3>Assumptions</h3>
     <ul>
-      <li>Pricing model is heuristic and front-end only (no backend calculation).</li>
-      <li>Base detailing rate used: ${currency(85)} per drawing before adjustment factors.</li>
+      <li>Primary quote source: backend API (${QUOTE_API_URL}).</li>
+      <li>Fallback to local heuristic model if API is unavailable.</li>
       <li>Human review is required before client submission.</li>
     </ul>
   `;
@@ -365,7 +422,7 @@ requirementsFileInput.addEventListener('change', async () => {
     applyOptionalServices(analysis.optionalServices);
 
     fileAnalysis.innerHTML = `<strong>${file.name}</strong> analyzed.<br>${analysis.findings.join(' ')}`;
-    renderQuote();
+    await renderQuote();
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not analyze file.';
     fileAnalysis.textContent = `File analysis failed: ${message}`;
@@ -408,7 +465,7 @@ clearFileBtn.addEventListener('click', () => {
   clearUploadedFileAndData();
 });
 
-form.addEventListener('submit', (event) => {
+form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  renderQuote();
+  await renderQuote();
 });

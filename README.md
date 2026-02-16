@@ -9,7 +9,7 @@ A lightweight web application that analyzes Tekla project requirements and gener
 - Optional requirements file upload (`.txt`, `.md`, `.csv`, `.pdf`) with auto-analysis.
 - Clear file fully resets uploaded file state, analyzed values, selected services, and quote result to defaults.
 - Automatic extraction/auto-fill for client name, timeline, drawing count, complexity, revision risk, and optional services from uploaded requirement content, with automatic quote generation after upload and fallback defaults so no manual required-field entry is needed.
-- Quote estimation based on project type, timeline, drawing count, complexity, and revision risk.
+- Quote estimation from backend API `https://repo-backend-wmej.onrender.com/api/quote` with local heuristic fallback.
 - Optional service add-ons (connection design, clash review, BIM coordination, QA/QC).
 - Pure HTML/CSS/JavaScript: no backend required.
 

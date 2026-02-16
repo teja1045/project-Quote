@@ -34,3 +34,13 @@ Then open `http://localhost:8080`.
 - This is an estimation helper, not a final commercial quote engine.
 - Uploaded file analysis is heuristic and keyword-based; PDF text extraction uses PDF.js in browser (scanned/image-only PDFs need OCR to extract text).
 - Review generated numbers with your project lead or estimator before sharing with clients.
+
+
+## Stable PDF deployment
+
+Place these files in `vendor/pdfjs/`:
+
+- `pdf.min.js`
+- `pdf.worker.min.js`
+
+The app tries local PDF.js first and falls back to CDN only if local files are missing.

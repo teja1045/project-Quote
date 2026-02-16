@@ -44,6 +44,35 @@ const servicePricing = {
 
 const QUOTE_API_URL = 'https://repo-backend-wmej.onrender.com/api/quote';
 
+
+const LOCAL_PDFJS_SRC = './vendor/pdfjs/pdf.min.js';
+const LOCAL_PDFJS_WORKER_SRC = './vendor/pdfjs/pdf.worker.min.js';
+const CDN_PDFJS_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.min.js';
+const CDN_PDFJS_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.js';
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+async function ensurePdfJsLoaded() {
+  if (window.pdfjsLib) return 'already-loaded';
+
+  try {
+    await loadScript(LOCAL_PDFJS_SRC);
+    return 'local';
+  } catch {
+    await loadScript(CDN_PDFJS_SRC);
+    return 'cdn';
+  }
+}
+
 function currency(value) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 }
@@ -211,11 +240,15 @@ function ensureAutofillDefaults(partial, fileName) {
 }
 
 async function extractTextFromPdf(file) {
+  const source = await ensurePdfJsLoaded();
+
   if (!window.pdfjsLib) {
-    throw new Error('PDF.js failed to load in browser.');
+    throw new Error('PDF.js failed to load in browser. Place pdf.min.js and pdf.worker.min.js in vendor/pdfjs for stable deployment.');
   }
 
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.js';
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = source === 'local' || source === 'already-loaded'
+    ? LOCAL_PDFJS_WORKER_SRC
+    : CDN_PDFJS_WORKER_SRC;
 
   const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
   const pageTexts = [];
